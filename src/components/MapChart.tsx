@@ -357,10 +357,12 @@ export default function MapChart({
         type: "map",
         map: "japan",
         nameProperty: "nam_ja", // Matches properties.nam_ja in GeoJSON
-        roam: !isMobile, // Disable zoom and pan on mobile to allow scrolling the page
+        roam: true, // Allow zoom and pan on all devices
+        zoom: isMobile ? 1.75 : 1, // Default zoom: 1.75 on mobile, 1 on desktop
+        center: isMobile ? [137.8, 38.0] : undefined, // Center on central Honshu by default on mobile
         scaleLimit: {
-          min: 1,
-          max: 5
+          min: 0.8,
+          max: 6
         },
         label: {
           show: false,
@@ -415,12 +417,62 @@ export default function MapChart({
     );
   }
 
+  const handleZoomIn = () => {
+    if (chartRef.current) {
+      const chartInstance = chartRef.current.getEchartsInstance();
+      chartInstance.dispatchAction({
+        type: "georoam",
+        zoom: 1.3
+      });
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (chartRef.current) {
+      const chartInstance = chartRef.current.getEchartsInstance();
+      chartInstance.dispatchAction({
+        type: "georoam",
+        zoom: 0.77
+      });
+    }
+  };
+
+  const handleZoomReset = () => {
+    if (chartRef.current) {
+      const chartInstance = chartRef.current.getEchartsInstance();
+      chartInstance.dispatchAction({
+        type: "restore"
+      });
+    }
+  };
+
   return (
     <div className="w-full h-full relative">
-      {/* 
-        CRITICAL: We use notMerge={false} to preserve the map zoom/pan (roam) state 
-        during data updates (timeline playback or metric changes)
-      */}
+      {/* Floating Zoom Controls */}
+      <div className="absolute right-4 top-4 flex flex-col gap-1.5 z-20">
+        <button
+          onClick={handleZoomIn}
+          className="w-8 h-8 rounded bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 flex items-center justify-center font-bold text-sm shadow-md active:scale-95 transition select-none"
+          title="拡大"
+        >
+          ＋
+        </button>
+        <button
+          onClick={handleZoomOut}
+          className="w-8 h-8 rounded bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 flex items-center justify-center font-bold text-sm shadow-md active:scale-95 transition select-none"
+          title="縮小"
+        >
+          －
+        </button>
+        <button
+          onClick={handleZoomReset}
+          className="w-12 h-6 mt-1 rounded bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 flex items-center justify-center text-[10px] font-bold shadow-md active:scale-95 transition select-none"
+          title="元に戻す"
+        >
+          リセット
+        </button>
+      </div>
+
       <ReactECharts
         ref={chartRef}
         option={option}
@@ -428,6 +480,12 @@ export default function MapChart({
         onEvents={onEvents}
         notMerge={false}
       />
+
+      {isMobile && (
+        <div className="absolute left-4 bottom-2 text-[9px] text-slate-500 pointer-events-none bg-slate-950/40 px-1 rounded select-none">
+          ※地図以外の部分をドラッグするとページをスクロールできます
+        </div>
+      )}
     </div>
   );
 }
