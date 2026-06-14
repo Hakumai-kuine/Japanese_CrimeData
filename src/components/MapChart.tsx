@@ -42,6 +42,27 @@ export default function MapChart({
   const [mapLoaded, setMapLoaded] = useState(false);
   const chartRef = useRef<ReactECharts>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [center, setCenter] = useState<[number, number] | undefined>(undefined);
+  const roamTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (roamTimeoutRef.current) {
+        clearTimeout(roamTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) {
+      setZoom(1.75);
+      setCenter([137.8, 38.0]);
+    } else {
+      setZoom(1);
+      setCenter(undefined);
+    }
+  }, [isMobile]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -358,8 +379,8 @@ export default function MapChart({
         map: "japan",
         nameProperty: "nam_ja", // Matches properties.nam_ja in GeoJSON
         roam: true, // Allow zoom and pan on all devices
-        zoom: isMobile ? 1.75 : 1, // Default zoom: 1.75 on mobile, 1 on desktop
-        center: isMobile ? [137.8, 38.0] : undefined, // Center on central Honshu by default on mobile
+        zoom: zoom,
+        center: center,
         scaleLimit: {
           min: 0.8,
           max: 6
@@ -400,6 +421,26 @@ export default function MapChart({
       if (params.data) {
         onRegionClick(params.data.id, params.data.name);
       }
+    },
+    georoam: (params: any) => {
+      if (roamTimeoutRef.current) {
+        clearTimeout(roamTimeoutRef.current);
+      }
+      roamTimeoutRef.current = setTimeout(() => {
+        if (chartRef.current) {
+          const chartInstance = chartRef.current.getEchartsInstance();
+          const opt = chartInstance.getOption() as any;
+          if (opt.series && opt.series[0]) {
+            const s = opt.series[0];
+            if (s.zoom !== undefined) {
+              setZoom(s.zoom);
+            }
+            if (s.center !== undefined) {
+              setCenter(s.center as [number, number]);
+            }
+          }
+        }
+      }, 200);
     }
   };
 
@@ -420,24 +461,46 @@ export default function MapChart({
   const handleZoomIn = () => {
     if (chartRef.current) {
       const chartInstance = chartRef.current.getEchartsInstance();
-      chartInstance.dispatchAction({
-        type: "georoam",
-        zoom: 1.3
-      });
+      const opt = chartInstance.getOption() as any;
+      if (opt.series && opt.series[0]) {
+        const s = opt.series[0];
+        const currentZoom = s.zoom !== undefined ? s.zoom : (isMobile ? 1.75 : 1);
+        const currentCenter = s.center !== undefined ? s.center as [number, number] : (isMobile ? [137.8, 38.0] as [number, number] : undefined);
+        
+        const nextZoom = Math.min(currentZoom * 1.3, 6);
+        setZoom(nextZoom);
+        if (currentCenter) {
+          setCenter(currentCenter);
+        }
+      }
     }
   };
 
   const handleZoomOut = () => {
     if (chartRef.current) {
       const chartInstance = chartRef.current.getEchartsInstance();
-      chartInstance.dispatchAction({
-        type: "georoam",
-        zoom: 0.77
-      });
+      const opt = chartInstance.getOption() as any;
+      if (opt.series && opt.series[0]) {
+        const s = opt.series[0];
+        const currentZoom = s.zoom !== undefined ? s.zoom : (isMobile ? 1.75 : 1);
+        const currentCenter = s.center !== undefined ? s.center as [number, number] : (isMobile ? [137.8, 38.0] as [number, number] : undefined);
+        
+        const nextZoom = Math.max(currentZoom * 0.77, 0.8);
+        setZoom(nextZoom);
+        if (currentCenter) {
+          setCenter(currentCenter);
+        }
+      }
     }
   };
 
   const handleZoomReset = () => {
+    const defaultZoom = isMobile ? 1.75 : 1;
+    const defaultCenter = isMobile ? [137.8, 38.0] as [number, number] : undefined;
+    
+    setZoom(defaultZoom);
+    setCenter(defaultCenter);
+
     if (chartRef.current) {
       const chartInstance = chartRef.current.getEchartsInstance();
       chartInstance.dispatchAction({
